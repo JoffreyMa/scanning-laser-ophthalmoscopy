@@ -10,8 +10,8 @@ from skimage import data, filters
 from matplotlib import pyplot as plt
 from dataloader import dataload
 
-def my_segmentation(img, img_mask, seuil):
-    img_out = (img_mask & (img < seuil))
+def my_segmentation(img, seuil):
+    img_out = img < seuil
     return img_out
 
 def evaluate(img_out, img_GT):
@@ -27,6 +27,7 @@ def evaluate(img_out, img_GT):
 
 def evaluate_process(process=my_segmentation, verbose=True, **kwargs):
     data = dataload()
+    metrics = []
     for i, d in enumerate(data):
         # Open image with grayscale
         img = np.asarray(d['image']).astype(np.uint8)
@@ -40,14 +41,17 @@ def evaluate_process(process=my_segmentation, verbose=True, **kwargs):
         img_GT =  np.asarray(d['label']).astype(np.bool_)
 
         # Apply method
-        img_out = process(img, img_mask, **kwargs)
+        img_out = (img_mask & process(img, **kwargs))
 
         # Compute metrics
         ACCU, RECALL, img_out_skel, GT_skel = evaluate(img_out, img_GT)
-        data[i]['accuracy'] = ACCU
-        data[i]['recall'] = RECALL
+        data[i].update({'accuracy':ACCU, 'recall':RECALL, 'image_skel':img_out_skel, 'GT_skel':GT_skel})
         if verbose:
             print(f"Image:{d['image_name']} | Accuracy={np.round(ACCU, 5)} | Recall={np.round(RECALL, 5)}")
+        metrics.append([ACCU, RECALL])
+    metrics_mean = np.mean(np.array(metrics), axis=0)
+    if verbose:
+        print(f'Mean over metrics : {metrics_mean}')
     return data
 
 if __name__ == '__main__':
