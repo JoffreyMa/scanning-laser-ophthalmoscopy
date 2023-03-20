@@ -15,8 +15,8 @@ def my_segmentation(img, seuil):
     return img_out
 
 def evaluate(img_out, img_GT):
-    GT_skel  = thin(img_GT, max_iter = 15) # On suppose que la demie epaisseur maximum 
-    img_out_skel  = thin(img_out, max_iter = 15) # d'un vaisseau est de 15 pixels...
+    GT_skel  = thin(img_GT, max_num_iter = 15) # On suppose que la demie epaisseur maximum 
+    img_out_skel  = thin(img_out, max_num_iter = 15) # d'un vaisseau est de 15 pixels...
     TP = np.sum(img_out_skel & img_GT) # Vrais positifs
     FP = np.sum(img_out_skel & ~img_GT) # Faux positifs
     FN = np.sum(GT_skel & ~img_out) # Faux negatifs
@@ -26,6 +26,7 @@ def evaluate(img_out, img_GT):
     return ACCU, RECALL, img_out_skel, GT_skel
 
 def evaluate_process(process=my_segmentation, verbose=True, **kwargs):
+    print(f"Evaluate process : {process.__name__}")
     data = dataload()
     metrics = []
     for i, d in enumerate(data):
@@ -51,7 +52,7 @@ def evaluate_process(process=my_segmentation, verbose=True, **kwargs):
         metrics.append([ACCU, RECALL])
     metrics_mean = np.mean(np.array(metrics), axis=0)
     if verbose:
-        print(f'Mean over metrics : {metrics_mean}')
+        print(f'Mean over metrics : {metrics_mean}\n')
     return data
 
 if __name__ == '__main__':
