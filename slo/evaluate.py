@@ -9,7 +9,7 @@ import math
 from skimage import data, filters
 from matplotlib import pyplot as plt
 
-from .dataloader import dataload
+from dataloader import dataload
 
 def my_segmentation(img, seuil):
     img_out = img < seuil

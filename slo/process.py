@@ -2,12 +2,14 @@
 # all process functions must take an uint8 grayscale image as input and return an img_out
 
 import cv2
-from skimage.filters import threshold_multiotsu, sato, apply_hysteresis_threshold, meijering
+from skimage.filters import threshold_multiotsu, sato, apply_hysteresis_threshold, meijering, threshold_otsu
 from skimage.filters import median
-from skimage.morphology import disk, remove_small_objects, binary_erosion, black_tophat
-from skimage.exposure import equalize_hist
+from skimage.morphology import disk, remove_small_objects, binary_erosion, black_tophat, area_opening
+from skimage.exposure import equalize_hist,equalize_adapthist
+from skimage.feature import hessian_matrix, hessian_matrix_eigvals
 from skimage import util
 import numpy as np
+import pywt
 
 def apply_denoise_gaussian_canny(img):
     # Denoise
@@ -132,4 +134,57 @@ def apply_background_removal_black_tophat(img):
     # Little white dots to remove
     no_small = remove_small_objects(hyst, 75) # empirical value 
 
+    return no_small
+
+def apply_thick_thin(img):
+    clahe = equalize_adapthist(img, kernel_size=64, clip_limit=0.03, nbins=64)
+
+    footprint = disk(8)
+    clahe_black = black_tophat(clahe, footprint)
+
+    clahe_black_op = area_opening(clahe_black, area_threshold=8, connectivity=8, parent=None, tree_traverser=None)
+
+    # Thick vessels
+    H_thick = hessian_matrix(clahe_black_op, sigma=4, mode='constant', cval=0, order='rc', use_gaussian_derivatives=False)
+    thick = 1-hessian_matrix_eigvals(H_thick)[1]
+    # Global Otsu Thresholding
+    thick_otsu = thick > threshold_otsu(thick)
+
+    # Thin vessels
+    H_thin = hessian_matrix(clahe_black_op, sigma=1, mode='constant', cval=0, order='rc', use_gaussian_derivatives=False)
+    thin = 1-hessian_matrix_eigvals(H_thin)[1] # 0 corresponds more to contours
+
+
+    # Equalize
+    # needs the mask
+    # Does not seem to work very well...
+    nrows, ncols = img.shape
+    row, col = np.ogrid[:nrows, :ncols]
+    img_mask = np.ones(img.shape)
+    invalid_pixels = ((row - nrows/2)**2 + (col - ncols/2)**2 > (nrows / 2)**2)
+    img_mask[invalid_pixels] = 0
+    thick_otsu_eq = equalize_hist(thick_otsu, nbins=128, mask=img_mask)
+
+    # Wavelet fusion
+    coeffs1 = pywt.wavedec2(thick_otsu_eq, 'db1')
+    coeffs2 = pywt.wavedec2(thin, 'db1')
+    fused_coeffs = []
+    for c1, c2 in zip(coeffs1, coeffs2):
+        fused_c = []
+        for band1, band2 in zip(c1, c2):
+            band_fused = (0.5*band1 + 2*band2)/2
+            fused_c.append(band_fused)
+        fused_coeffs.append(tuple(fused_c))
+    fused_image = pywt.waverec2(fused_coeffs, 'db1')
+    fused_image_min = np.min(fused_image)
+    fused_image_max = np.max(fused_image)
+    output = 255* ((fused_image - fused_image_min)/(fused_image_max-fused_image_min))
+    output = cv2.resize(output,thick_otsu_eq.T.shape)
+
+    tt = output # tt for thick_thin
+    low = 90
+    high = 110
+    hyst = apply_hysteresis_threshold(tt, low, high)
+
+    no_small = remove_small_objects(hyst, 20) # empirical value 
     return no_small
