@@ -188,3 +188,7 @@ def apply_thick_thin(img):
 
     no_small = remove_small_objects(hyst, 20) # empirical value 
     return no_small
+
+def apply_mix_or(img):
+    resultat = (apply_thick_thin(img) | apply_background_removal_meijering(img) | apply_background_removal_black_tophat(img)) & apply_background_removal_black_tophat(img)
+    return resultat
