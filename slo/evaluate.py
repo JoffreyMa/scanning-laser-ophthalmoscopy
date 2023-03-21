@@ -8,7 +8,8 @@ from skimage.util import img_as_ubyte
 import math
 from skimage import data, filters
 from matplotlib import pyplot as plt
-from dataloader import dataload
+
+from .dataloader import dataload
 
 def my_segmentation(img, seuil):
     img_out = img < seuil
@@ -53,7 +54,7 @@ def evaluate_process(process=my_segmentation, verbose=True, **kwargs):
     metrics_mean = np.mean(np.array(metrics), axis=0)
     if verbose:
         print(f'Mean over metrics : {metrics_mean}\n')
-    return data
+    return None
 
 if __name__ == '__main__':
     evaluate_process(seuil=100)
